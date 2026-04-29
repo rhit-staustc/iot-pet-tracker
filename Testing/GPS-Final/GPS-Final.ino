@@ -15,7 +15,7 @@ uint8_t DEVICE_ID = 0;
 TinyGPSPlus gps;
 
 struct GPSPacket {
-  uint8_t status;  // [reserved(4)|fresh(1)|fix_valid(1)|HID(2)]
+  uint8_t status;  // [reserved(4)|fresh(1)|fix_valid(1)|ID(2)]
   uint8_t battery; // 0-100%
   float lat;
   float lon;
