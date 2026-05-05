@@ -13,7 +13,10 @@ GyroData gyroData;
 // behavior classification constants
 #define RUN_SPEED_IN_MPH 5 
 #define WALK_SPEED_IN_MPH 1
-#define HEAD_DIRECTION gyroData.gyroX
+#define HEAD_DIRECTION accelData.accelX
+#define ACCEL_NORMALIZE 8
+#define HEAD_ORIENTATION (HEAD_DIRECTION / ACCEL_NORMALIZE)
+#define SITTING_THRESHOLD .33 // we consider sitting to be head orientation greater than ~33 degrees above horizon 
 
 // pin definitions
 #define PIN_GPS_EN 34
@@ -125,21 +128,35 @@ void loop() {
       Serial.println(gps.charsProcessed());
     }
   }
+
   IMU.update();
   IMU.getAccel(&accelData);
   IMU.getGyro(&gyroData);
-  // Serial.print(accelData.accelX);
-  // Serial.print("\t");
-  // Serial.print(accelData.accelY);
-  // Serial.print("\t");
-  // Serial.print(accelData.accelZ);
-  // Serial.print("\t");
-  // Serial.print(gyroData.gyroX);
-  // Serial.print("\t");
-  // Serial.print(gyroData.gyroY);
-  // Serial.print("\t");
-  // Serial.println(gyroData.gyroZ);
+  // printIMUdata();
+  printBehaviorData();
   
+  
+  delay(50);
+}
+
+void printIMUdata() {
+  
+  Serial.print(accelData.accelX);
+  Serial.print("\t");
+  Serial.print(accelData.accelY);
+  Serial.print("\t");
+  Serial.print(accelData.accelZ);
+  Serial.print("\t");
+  Serial.print(gyroData.gyroX);
+  Serial.print("\t");
+  Serial.print(gyroData.gyroY);
+  Serial.print("\t");
+  Serial.println(gyroData.gyroZ);
+
+}
+
+void printBehaviorData() {
+
   double speed_in_mph = gps.speed.mph();
   // behavior classification with gps sensor data
   if (speed_in_mph >= RUN_SPEED_IN_MPH) {
@@ -147,11 +164,14 @@ void loop() {
   } else if (speed_in_mph >= WALK_SPEED_IN_MPH) {
     Serial.println("Walking");
   } else {
-    Serial.println("Idle");
-
     // behavior subclassification with imu sensor data
+    if (HEAD_ORIENTATION >= SITTING_THRESHOLD) {
+      Serial.println("Sitting");
+    } else if (false) {
+      // TODO: rolling behavior identification
+    } else {
+      Serial.println("Idle");
+    }
+
   }
-  
-  
-  delay(50);
 }
