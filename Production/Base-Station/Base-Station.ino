@@ -6,7 +6,7 @@
 #define RF_FREQUENCY 915000000
 #define TX_OUTPUT_POWER 28
 #define LORA_BANDWIDTH 0
-#define LORA_SPREADING_FACTOR 7
+#define LORA_SPREADING_FACTOR 10
 #define LORA_CODINGRATE 1
 #define LORA_PREAMBLE_LENGTH 8
 #define LORA_SYMBOL_TIMEOUT 0
@@ -33,6 +33,7 @@ struct CmdPacket {
 struct TrackerState {
   GPSPacket last;
   int16_t rssi;
+  int16_t snr;
   bool active;
 };
 
@@ -72,13 +73,15 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
     if (id < MAX_TRACKERS) {
       trackers[id].last = *pkt;
       trackers[id].rssi = rssi;
+      trackers[id].snr = snr;
       trackers[id].active = true;
 
       Serial.printf("[RX] ID:%d Fix:%s Fresh:%s Bat:%d%% Lat:%.6f Lon:%.6f "
-                    "Spd:%.1f Dir:%.1f RSSI:%d\n",
+                    "Spd:%.1f Dir:%.1f RSSI:%d SNR:%d\n",
                     id, (pkt->status >> 2) & 1 ? "Y" : "N",
                     (pkt->status >> 3) & 1 ? "Y" : "N", pkt->battery, pkt->lat,
-                    pkt->lon, pkt->speed / 100.0, pkt->course / 100.0, rssi);
+                    pkt->lon, pkt->speed / 100.0, pkt->course / 100.0, rssi,
+                    snr);
 
       updateDisplay(id);
     }
@@ -106,7 +109,8 @@ void updateDisplay(uint8_t id) {
   display.drawString(0, 39,
                      "Speed: " + String(t.last.speed / 100.0, 1) +
                          "mph Dir: " + String(t.last.course / 100.0, 1));
-  display.drawString(0, 52, "RSSI: " + String(t.rssi) + " dBm");
+  display.drawString(
+      0, 52, "RSSI: " + String(t.rssi) + " dBm " + "SNR: " + String(t.snr));
   display.display();
 }
 
