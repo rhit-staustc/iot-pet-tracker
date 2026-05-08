@@ -32,8 +32,18 @@ const float VOLT_DIV = 4.9;
 
 TinyGPSPlus gps;
 
+enum BehaviorState : uint8_t {
+  BEHAVIOR_IDLE    = 0,
+  BEHAVIOR_WALKING = 1,
+  BEHAVIOR_RUNNING = 2,
+  BEHAVIOR_SITTING = 3,
+  BEHAVIOR_ROLLING = 4,
+};
+
+// Pack behavior into the top 4 bits of the status byte: status |= (b << 4)
+
 struct GPSPacket {
-  uint8_t status;  // [reserved(4)|fresh(1)|fix_valid(1)|ID(2)]
+  uint8_t status;  // [behavior(4)|fresh(1)|fix_valid(1)|ID(2)]
   uint8_t battery; // 0-100%
   float lat;
   float lon;
@@ -59,30 +69,26 @@ uint8_t getBatteryPercent() {
   return (uint8_t)constrain(percent, 0, 100);
 }
 
-uint8_t classifyBehavior() {
+BehaviorState classifyBehavior() {
 
   double speed_in_mph = gps.speed.mph();
   // behavior classification with gps sensor data
   if (speed_in_mph >= RUN_SPEED_IN_MPH) {
-    return (uint8_t) 2;
     Serial.println("Running");
+    return BEHAVIOR_RUNNING;
   } else if (speed_in_mph >= WALK_SPEED_IN_MPH) {
-    return (uint8_t) 1;
     Serial.println("Walking");
-
+    return BEHAVIOR_WALKING;
   } else {
     // behavior subclassification with imu sensor data
     if (HEAD_ORIENTATION >= SITTING_THRESHOLD) {
-      return (uint8_t) 3;
       Serial.println("Sitting");
-    } else if (false) {
-      // TODO: roll-over behavior not implemented
-      return (uint8_t) 4;
+      return BEHAVIOR_SITTING;
     } else {
-      return (uint8_t) 0;
+      // TODO: roll-over detection not implemented
       Serial.println("Idle");
+      return BEHAVIOR_IDLE;
     }
-
   }
 }
 
@@ -91,6 +97,7 @@ GPSPacket buildPacket() {
   bool fixValid = gps.location.isValid();
   bool fresh = gps.location.age() < AGE_THRESHOLD;
   packet.status = (DEVICE_ID & 0x03);
+  
   if (fixValid)
     packet.status |= (1 << 2);
   if (fresh)
