@@ -59,6 +59,33 @@ uint8_t getBatteryPercent() {
   return (uint8_t)constrain(percent, 0, 100);
 }
 
+uint8_t classifyBehavior() {
+
+  double speed_in_mph = gps.speed.mph();
+  // behavior classification with gps sensor data
+  if (speed_in_mph >= RUN_SPEED_IN_MPH) {
+    return (uint8_t) 2;
+    Serial.println("Running");
+  } else if (speed_in_mph >= WALK_SPEED_IN_MPH) {
+    return (uint8_t) 1;
+    Serial.println("Walking");
+
+  } else {
+    // behavior subclassification with imu sensor data
+    if (HEAD_ORIENTATION >= SITTING_THRESHOLD) {
+      return (uint8_t) 3;
+      Serial.println("Sitting");
+    } else if (false) {
+      // TODO: roll-over behavior not implemented
+      return (uint8_t) 4;
+    } else {
+      return (uint8_t) 0;
+      Serial.println("Idle");
+    }
+
+  }
+}
+
 GPSPacket buildPacket() {
   GPSPacket packet;
   bool fixValid = gps.location.isValid();
