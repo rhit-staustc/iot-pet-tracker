@@ -110,6 +110,16 @@ GPSPacket buildPacket() {
   return packet;
 }
 
+const char* behaviorName(uint8_t status) {
+  switch ((BehaviorState)(status >> 4)) {
+    case BEHAVIOR_WALKING: return "Walking";
+    case BEHAVIOR_RUNNING: return "Running";
+    case BEHAVIOR_SITTING: return "Sitting";
+    case BEHAVIOR_ROLLING: return "Rolling";
+    default:               return "Idle";
+  }
+}
+
 void printPacket(GPSPacket &packet) {
   Serial.print("ID: ");
   Serial.print(packet.status & 0x03);
@@ -117,6 +127,8 @@ void printPacket(GPSPacket &packet) {
   Serial.print((packet.status >> 2) & 1 ? "YES" : "NO");
   Serial.print(" | Fresh: ");
   Serial.print((packet.status >> 3) & 1 ? "YES" : "NO");
+  Serial.print(" | Behavior: ");
+  Serial.print(behaviorName(packet.status));
   Serial.print(" | Batt: ");
   Serial.print(packet.battery);
   Serial.print("% | Lat: ");
