@@ -102,6 +102,7 @@ GPSPacket buildPacket() {
     packet.status |= (1 << 2);
   if (fresh)
     packet.status |= (1 << 3);
+  packet.status |= (classifyBehavior() << 4);
   packet.battery = getBatteryPercent();
   packet.lat = (float)gps.location.lat();
   packet.lon = (float)gps.location.lng();
