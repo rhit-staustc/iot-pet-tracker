@@ -265,6 +265,9 @@ void loop() {
     while (Serial1.available()) {
       gps.encode(Serial1.read());
     }
+    IMU.update();
+    IMU.getAccel(&accelData);
+    IMU.getGyro(&gyroData);
     GPSPacket packet = buildPacket();
     printPacket(packet);
     updateDisplay(packet);
@@ -285,6 +288,9 @@ void loop() {
     while (Serial1.available()) {
       gps.encode(Serial1.read());
     }
+    IMU.update();
+    IMU.getAccel(&accelData);
+    IMU.getGyro(&gyroData);
     Radio.IrqProcess();
     if (millis() - lastPacket >= TX_INTERVAL_MS) {
       Radio.Sleep();
