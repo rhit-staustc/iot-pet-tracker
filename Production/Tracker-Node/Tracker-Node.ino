@@ -74,19 +74,15 @@ BehaviorState classifyBehavior() {
   double speed_in_mph = gps.speed.mph();
   // behavior classification with gps sensor data
   if (speed_in_mph >= RUN_SPEED_IN_MPH) {
-    Serial.println("Running");
     return BEHAVIOR_RUNNING;
   } else if (speed_in_mph >= WALK_SPEED_IN_MPH) {
-    Serial.println("Walking");
     return BEHAVIOR_WALKING;
   } else {
     // behavior subclassification with imu sensor data
     if (HEAD_ORIENTATION >= SITTING_THRESHOLD) {
-      Serial.println("Sitting");
       return BEHAVIOR_SITTING;
     } else {
       // TODO: roll-over detection not implemented
-      Serial.println("Idle");
       return BEHAVIOR_IDLE;
     }
   }
