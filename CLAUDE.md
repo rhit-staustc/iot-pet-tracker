@@ -45,6 +45,8 @@ Both base station and tracker nodes use the same hardware with different firmwar
 
 ## Build & Development Commands
 
+**Always use Bash for shell commands, not PowerShell.** When calling Bash from this Windows environment, use paths like `/c/Users/staustc/repos/iot-pet-tracker`.
+
 **Compile the base station:**
 ```bash
 cd Production
