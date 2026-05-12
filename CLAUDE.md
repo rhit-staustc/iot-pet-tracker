@@ -45,32 +45,52 @@ Both base station and tracker nodes use the same hardware with different firmwar
 
 ## Build & Development Commands
 
-**Always use Bash for shell commands, not PowerShell.** When calling Bash from this Windows environment, use paths like `/c/Users/staustc/repos/iot-pet-tracker`.
+**Always use Bash for shell commands, not PowerShell.** Use the scripts in `scripts/` directory for all build operations.
 
-**Compile the base station:**
+### Quick Build
+
 ```bash
-cd Production
-arduino-cli compile --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc Base-Station
+# Build and flash Base Station
+./scripts/build.sh build-base
+
+# Build and flash Tracker Node
+./scripts/build.sh build-tracker
+
+# Specify different COM port
+./scripts/build.sh build-tracker COM4
 ```
 
-**Flash to board on COM3:**
+### Individual Operations
+
 ```bash
-arduino-cli upload --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc -p COM3 Base-Station
+# Compile only
+./scripts/build.sh compile-base
+./scripts/build.sh compile-tracker
+
+# Upload only
+./scripts/build.sh upload-base [PORT]
+./scripts/build.sh upload-tracker [PORT]
+
+# Monitor serial output (default: COM3, 115200 baud)
+./scripts/build.sh monitor [PORT] [BAUD]
 ```
 
-**Monitor serial output (115200 baud):**
-```bash
-# Using screen (macOS/Linux):
-screen /dev/ttyUSB0 115200
+### Manual Commands (if needed)
 
-# Using arduino-cli monitor:
-arduino-cli monitor -p /dev/ttyUSB0 -c speed=115200
+All scripts use `arduino-cli`. For direct command usage:
+
+```bash
+# Compile
+arduino-cli compile --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc Production/Base-Station
+
+# Upload
+arduino-cli upload --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc -p COM3 Production/Base-Station
+
+# Monitor
+arduino-cli monitor -p COM3 --config baudrate=115200
 ```
 
-**Testing scripts** in `Testing/` directory:
-- `compile.sh`: Compile base station
-- `upload.sh`: Flash to COM3
-- `monitor.sh`: Open serial monitor
+See [README.md](README.md) for setup instructions and troubleshooting.
 
 ## Key Implementation Details
 
