@@ -247,11 +247,11 @@ void updateDisplay(GPSPacket &packet) {
       0, 0,
       "ID:" + String(packet.status & 0x03) +
           " Fix:" + String((packet.status >> 2) & 1 ? "Y" : "N") +
-          " Fresh:" + String((packet.status >> 3) & 1 ? "Y" : "N") +
-          " Bat:" + String(packet.battery) + "%");
+          " " + String(behaviorName(packet.status)));
+  display.drawString(0, 11, "Bat:" + String(packet.battery) + "%");
   display.setFont(ArialMT_Plain_16);
-  display.drawString(0, 13, "Lat: " + String(packet.lat, 5));
-  display.drawString(0, 32, "Lon: " + String(packet.lon, 5));
+  display.drawString(0, 22, "Lat: " + String(packet.lat, 5));
+  display.drawString(0, 38, "Lon: " + String(packet.lon, 5));
   display.setFont(ArialMT_Plain_10);
   display.drawString(0, 51,
                      "Spd: " + String(packet.speed / 100.0, 1) + "mph" +
