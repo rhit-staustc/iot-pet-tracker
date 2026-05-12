@@ -34,6 +34,7 @@
 #define ACCEL_NORMALIZE 8
 #define HEAD_ORIENTATION (HEAD_DIRECTION / ACCEL_NORMALIZE)
 #define SITTING_THRESHOLD 0.33
+#define SPEED_FILTER_SIZE 8
 
 uint8_t DEVICE_ID = 2;
 const float VOLT_DIV = 4.9;
@@ -44,6 +45,9 @@ MPU6500 IMU;
 calData calib = {0};
 AccelData accelData;
 GyroData gyroData;
+
+float speedBuffer[SPEED_FILTER_SIZE] = {0};
+uint8_t speedBufferIdx = 0;
 
 enum BehaviorState : uint8_t {
   BEHAVIOR_IDLE    = 0,
@@ -82,9 +86,18 @@ uint8_t getBatteryPercent() {
   return (uint8_t)constrain(percent, 0, 100);
 }
 
-BehaviorState classifyBehavior() {
+double getFilteredSpeed() {
+  speedBuffer[speedBufferIdx] = gps.speed.mph();
+  speedBufferIdx = (speedBufferIdx + 1) % SPEED_FILTER_SIZE;
 
-  double speed_in_mph = gps.speed.mph();
+  double sum = 0;
+  for (int i = 0; i < SPEED_FILTER_SIZE; i++) {
+    sum += speedBuffer[i];
+  }
+  return sum / SPEED_FILTER_SIZE;
+}
+
+BehaviorState classifyBehavior(double speed_in_mph) {
   // behavior classification with gps sensor data
   if (speed_in_mph >= RUN_SPEED_IN_MPH) {
     return BEHAVIOR_RUNNING;
@@ -106,16 +119,18 @@ GPSPacket buildPacket() {
   bool fixValid = gps.location.isValid();
   bool fresh = gps.location.age() < AGE_THRESHOLD;
   packet.status = (DEVICE_ID & 0x03);
-  
+
   if (fixValid)
     packet.status |= (1 << 2);
   if (fresh)
     packet.status |= (1 << 3);
-  packet.status |= (classifyBehavior() << 4);
+
+  double filteredSpeed = getFilteredSpeed();
+  packet.status |= (classifyBehavior(filteredSpeed) << 4);
   packet.battery = getBatteryPercent();
   packet.lat = (float)gps.location.lat();
   packet.lon = (float)gps.location.lng();
-  packet.speed = (uint16_t)(gps.speed.mph() * 100);
+  packet.speed = (uint16_t)(filteredSpeed * 100);
   packet.course = (uint16_t)(gps.course.deg() * 100);
   return packet;
 }
