@@ -28,6 +28,13 @@
 #define BOARD_LED 35
 #define TX_INTERVAL_MS 500
 
+#define RUN_SPEED_IN_MPH 5
+#define WALK_SPEED_IN_MPH 1
+#define HEAD_DIRECTION accelData.accelX
+#define ACCEL_NORMALIZE 8
+#define HEAD_ORIENTATION (HEAD_DIRECTION / ACCEL_NORMALIZE)
+#define SITTING_THRESHOLD 0.33
+
 uint8_t DEVICE_ID = 2;
 const float VOLT_DIV = 4.9;
 
