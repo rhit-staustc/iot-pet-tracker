@@ -1,4 +1,5 @@
 #include "Arduino.h"
+#include "FastIMU.h"
 #include "HT_SSD1306Wire.h"
 #include "HT_TinyGPS++.h"
 #include "LoRaWan_APP.h"
@@ -31,6 +32,11 @@ uint8_t DEVICE_ID = 2;
 const float VOLT_DIV = 4.9;
 
 TinyGPSPlus gps;
+
+MPU6500 IMU;
+calData calib = {0};
+AccelData accelData;
+GyroData gyroData;
 
 enum BehaviorState : uint8_t {
   BEHAVIOR_IDLE    = 0,
