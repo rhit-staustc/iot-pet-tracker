@@ -153,11 +153,33 @@ void printPacket(GPSPacket &packet) {
 
 void setup() {
   Serial.begin(115200);
+  Wire.begin(6, 7);
+  Wire.setClock(400000);
+
   pinMode(PIN_GPS_EN, OUTPUT);
   digitalWrite(PIN_GPS_EN, LOW);
   delay(1000);
   Serial1.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
   gpsConfig();
+
+  IMU.init(calib, 0x68);
+  Serial.println("Keep IMU level.");
+  delay(5000);
+  IMU.calibrateAccelGyro(&calib);
+  Serial.println("Calibration done!");
+  Serial.print("Accel biases X/Y/Z: ");
+  Serial.print(calib.accelBias[0]);
+  Serial.print(", ");
+  Serial.print(calib.accelBias[1]);
+  Serial.print(", ");
+  Serial.println(calib.accelBias[2]);
+  Serial.print("Gyro biases X/Y/Z: ");
+  Serial.print(calib.gyroBias[0]);
+  Serial.print(", ");
+  Serial.print(calib.gyroBias[1]);
+  Serial.print(", ");
+  Serial.println(calib.gyroBias[2]);
+  delay(2000);
 
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
 
