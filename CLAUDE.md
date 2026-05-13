@@ -45,58 +45,50 @@ Both base station and tracker nodes use the same hardware with different firmwar
 
 ## Build & Development Commands
 
-**Use Bash for shell commands** (`./scripts/build.sh`), and **PowerShell for serial monitoring** (`scripts/monitor-capture.ps1`). WSL cannot access Windows COM ports, so the PowerShell script captures data natively on Windows and saves to a file Claude Code can read.
+**Use PowerShell for all commands.** `arduino-cli` is in your PATH; the monitor script is in `scripts/monitor-capture.ps1`.
 
-### Quick Build
+### Compilation
 
-```bash
-# Build and flash Base Station
-./scripts/build.sh build-base
+```powershell
+# Compile Base Station
+arduino-cli compile --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc Production/Base-Station
 
-# Build and flash Tracker Node
-./scripts/build.sh build-tracker
-
-# Specify different COM port
-./scripts/build.sh build-tracker COM4
+# Compile Tracker Node
+arduino-cli compile --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc Production/Tracker-Node
 ```
 
-### Individual Operations
+### Upload to Board
 
-```bash
-# Compile only
-./scripts/build.sh compile-base
-./scripts/build.sh compile-tracker
+```powershell
+# Upload Base Station (default COM3)
+arduino-cli upload --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc -p COM3 Production/Base-Station
 
-# Upload only
-./scripts/build.sh upload-base [PORT]
-./scripts/build.sh upload-tracker [PORT]
+# Upload Tracker Node to different COM port
+arduino-cli upload --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc -p COM4 Production/Tracker-Node
 ```
 
-### Serial Monitoring (Windows)
+### Serial Monitoring
 
 ```powershell
 # Capture serial output for 30 seconds (default COM3, 115200 baud)
-powershell scripts/monitor-capture.ps1 -DurationSeconds 30
+powershell -ExecutionPolicy Bypass -File ./scripts/monitor-capture.ps1 -DurationSeconds 30
 
 # Specify different port or baud rate
-powershell scripts/monitor-capture.ps1 -ComPort COM4 -BaudRate 115200 -DurationSeconds 30
+powershell -ExecutionPolicy Bypass -File ./scripts/monitor-capture.ps1 -ComPort COM4 -BaudRate 115200 -DurationSeconds 30
 ```
 
-The script saves output to a timestamped file (e.g., `monitor_20260513_143028.txt`) that can be read with `Read monitor_*.txt`.
+The script saves timestamped output (e.g., `monitor_20260513_143028.txt`) that can be read with `Read monitor_*.txt`.
 
-### Manual Commands (if needed)
+### Quick Reference (Compile + Upload)
 
-All scripts use `arduino-cli`. For direct command usage:
-
-```bash
-# Compile
-arduino-cli compile --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc Production/Base-Station
-
-# Upload
+```powershell
+# Compile and upload Base Station
+arduino-cli compile --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc Production/Base-Station; `
 arduino-cli upload --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc -p COM3 Production/Base-Station
 
-# Monitor
-arduino-cli monitor -p COM3 --config baudrate=115200
+# Compile and upload Tracker Node
+arduino-cli compile --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc Production/Tracker-Node; `
+arduino-cli upload --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc -p COM3 Production/Tracker-Node
 ```
 
 See [README.md](README.md) for setup instructions and troubleshooting.

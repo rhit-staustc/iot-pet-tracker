@@ -5,18 +5,25 @@ param(
 )
 
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$outputFile = "monitor_${timestamp}.txt"
+$outputFile = Join-Path (Get-Location) "monitor_${timestamp}.txt"
 
 Write-Host "Capturing serial output from $ComPort at $BaudRate baud for ${DurationSeconds}s..."
 Write-Host "Output: $outputFile"
 
-$job = Start-Job -ScriptBlock {
-    param($port, $baud, $outFile)
-    & arduino-cli monitor -p $port --config "baudrate=$baud" 2>&1 | Out-File -FilePath $outFile -Encoding utf8
-} -ArgumentList $ComPort, $BaudRate, $outputFile
+$port = New-Object System.IO.Ports.SerialPort $ComPort, $BaudRate, None, 8, One
+$port.ReadTimeout = 500
+$port.Open()
 
-Start-Sleep -Seconds $DurationSeconds
-Stop-Job $job
-Remove-Job $job
+$lines = @()
+$start = Get-Date
+while ((Get-Date) - $start -lt [TimeSpan]::FromSeconds($DurationSeconds)) {
+    try {
+        $line = $port.ReadLine()
+        $lines += $line
+    } catch [System.TimeoutException] {}
+}
 
-Write-Host "Done. Saved to: $outputFile"
+$port.Close()
+$lines | Out-File -FilePath $outputFile -Encoding utf8
+
+Write-Host "Done. Saved to: $outputFile ($($lines.Count) lines)"
