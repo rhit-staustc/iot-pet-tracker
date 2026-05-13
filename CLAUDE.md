@@ -40,12 +40,12 @@ Both base station and tracker nodes use the same hardware with different firmwar
 - **GPS module**: u-blox GPS (39=RX, 38=TX) reads location and speed
 - **Battery monitor**: ADC on pin 37 tracks voltage; calculated as percentage (3500-4200 mV)
 - **LoRa transmitter**: Sends GPSPacket every 500ms with device ID embedded in status byte
-- **Behavior classification**: Motion analysis (acceleration, heading change) on a separate `behavior-classification` branch
-- **OLED display**: Shows GPS fix status, battery, coordinates, and signal metrics
+- **IMU (MPU6500)**: Reads accelerometer and gyro on I2C (Wire) for behavior classification
+- **Behavior classification**: Motion analysis (acceleration, speed) for idle/walking/running/sitting states
 
 ## Build & Development Commands
 
-**Always use Bash for shell commands, not PowerShell.** Use the scripts in `scripts/` directory for all build operations.
+**Use Bash for shell commands** (`./scripts/build.sh`), and **PowerShell for serial monitoring** (`scripts/monitor-capture.ps1`). WSL cannot access Windows COM ports, so the PowerShell script captures data natively on Windows and saves to a file Claude Code can read.
 
 ### Quick Build
 
@@ -70,10 +70,19 @@ Both base station and tracker nodes use the same hardware with different firmwar
 # Upload only
 ./scripts/build.sh upload-base [PORT]
 ./scripts/build.sh upload-tracker [PORT]
-
-# Monitor serial output (default: COM3, 115200 baud)
-./scripts/build.sh monitor [PORT] [BAUD]
 ```
+
+### Serial Monitoring (Windows)
+
+```powershell
+# Capture serial output for 30 seconds (default COM3, 115200 baud)
+powershell scripts/monitor-capture.ps1 -DurationSeconds 30
+
+# Specify different port or baud rate
+powershell scripts/monitor-capture.ps1 -ComPort COM4 -BaudRate 115200 -DurationSeconds 30
+```
+
+The script saves output to a timestamped file (e.g., `monitor_20260513_143028.txt`) that can be read with `Read monitor_*.txt`.
 
 ### Manual Commands (if needed)
 
@@ -108,9 +117,9 @@ Base station connects to `RHIT-OPEN` (open network, no password). Edit lines 9-1
 
 Web dashboard is served at `http://<device-ip>/` and displays all 4 tracker cards with live SSE updates.
 
-### OLED Display
+### IMU and I2C
 
-Both devices use a shared `display` object (I2C at 0x3c). Base station updates after each LoRa RX; tracker updates periodically. Display refreshes are non-blocking.
+Tracker node uses the MPU6500 IMU on the shared I2C bus (Wire, pins 6/7). The IMU is calibrated on startup (5-second hold-still period) and provides accelerometer/gyro data for behavior classification. All devices use Wire (not Wire1) to avoid FastIMU compatibility issues.
 
 ## Repository Structure
 

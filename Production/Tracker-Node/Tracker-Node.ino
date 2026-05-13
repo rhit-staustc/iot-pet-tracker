@@ -1,6 +1,5 @@
 #include "Arduino.h"
 #include "FastIMU.h"
-#include "HT_SSD1306Wire.h"
 #include "HT_TinyGPS++.h"
 #include "LoRaWan_APP.h"
 #include <Wire.h>
@@ -70,8 +69,6 @@ struct GPSPacket {
 
 typedef enum { LOWPOWER, STATE_RX, STATE_TX } States_t;
 
-static SSD1306Wire display(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64,
-                           RST_OLED);
 static RadioEvents_t RadioEvents;
 static unsigned long lastPacket = 0;
 States_t state;
@@ -168,6 +165,10 @@ void printPacket(GPSPacket &packet) {
 
 void setup() {
   Serial.begin(115200);
+
+  Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
+  Serial.println("Mcu initialized");
+
   Wire.begin(6, 7);
   Wire.setClock(400000);
 
@@ -177,9 +178,11 @@ void setup() {
   Serial1.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
   gpsConfig();
 
+  Serial.println("Initializing IMU...");
   IMU.init(calib, 0x68);
-  Serial.println("Keep IMU level.");
+  Serial.println("IMU init complete. Keep IMU level.");
   delay(5000);
+  Serial.println("Starting IMU calibration...");
   IMU.calibrateAccelGyro(&calib);
   Serial.println("Calibration done!");
   Serial.print("Accel biases X/Y/Z: ");
@@ -196,16 +199,11 @@ void setup() {
   Serial.println(calib.gyroBias[2]);
   delay(2000);
 
-  Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
+  IMU.init(calib, 0x68);
 
   pinMode(BOARD_LED, OUTPUT);
   digitalWrite(BOARD_LED, LOW);
 
-  pinMode(Vext, OUTPUT);
-  digitalWrite(Vext, LOW);
-  delay(100);
-  display.init();
-  display.setFont(ArialMT_Plain_16);
 
   RadioEvents.TxDone = OnTxDone;
   RadioEvents.TxTimeout = OnTxTimeout;
@@ -254,26 +252,6 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
   }
 }
 
-void updateDisplay(GPSPacket &packet) {
-  display.clear();
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(
-      0, 0,
-      "ID:" + String(packet.status & 0x03) +
-          " Fix:" + String((packet.status >> 2) & 1 ? "Y" : "N") +
-          " " + String(behaviorName(packet.status)));
-  display.drawString(0, 11, "Bat:" + String(packet.battery) + "%");
-  display.setFont(ArialMT_Plain_16);
-  display.drawString(0, 22, "Lat: " + String(packet.lat, 5));
-  display.drawString(0, 38, "Lon: " + String(packet.lon, 5));
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(0, 51,
-                     "Spd: " + String(packet.speed / 100.0, 1) + "mph" +
-                         "  Dir: " + String(packet.course / 100.0, 1));
-  display.display();
-}
-
 void loop() {
   switch (state) {
   case STATE_TX: {
@@ -283,9 +261,30 @@ void loop() {
     IMU.update();
     IMU.getAccel(&accelData);
     IMU.getGyro(&gyroData);
+    Serial.print("Gyro Biases: ");
+    Serial.print(calib.gyroBias[0]);
+    Serial.print(", ");
+    Serial.print(calib.gyroBias[1]);
+    Serial.print(", ");
+    Serial.println(calib.gyroBias[2]);
+    Serial.print("IMU Accel: ");
+    Serial.print(accelData.accelX);
+    Serial.print(", ");
+    Serial.print(accelData.accelY);
+    Serial.print(", ");
+    Serial.println(accelData.accelZ);
+    Serial.print("IMU Gyro (calibrated): ");
+    Serial.print(gyroData.gyroX);
+    Serial.print(", ");
+    Serial.print(gyroData.gyroY);
+    Serial.print(", ");
+    Serial.println(gyroData.gyroZ);
     GPSPacket packet = buildPacket();
+    Serial.print("Speed (mph): ");
+    Serial.println(packet.speed / 100.0);
+    Serial.print("Behavior: ");
+    Serial.println(behaviorName(packet.status));
     printPacket(packet);
-    updateDisplay(packet);
     digitalWrite(BOARD_LED, HIGH);
     Radio.Send((uint8_t *)&packet, sizeof(GPSPacket));
     digitalWrite(BOARD_LED, LOW);
