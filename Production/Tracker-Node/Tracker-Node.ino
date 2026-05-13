@@ -40,7 +40,7 @@ const float VOLT_DIV = 4.9;
 
 TinyGPSPlus gps;
 
-MPU6500 IMU;
+MPU6500 IMU(Wire1);
 calData calib = {0};
 AccelData accelData;
 GyroData gyroData;
@@ -169,8 +169,8 @@ void setup() {
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
   Serial.println("Mcu initialized");
 
-  Wire.begin(6, 7);
-  Wire.setClock(400000);
+  Wire1.begin(6, 7);
+  Wire1.setClock(400000);
 
   pinMode(PIN_GPS_EN, OUTPUT);
   digitalWrite(PIN_GPS_EN, LOW);
@@ -184,6 +184,7 @@ void setup() {
   delay(5000);
   Serial.println("Starting IMU calibration...");
   IMU.calibrateAccelGyro(&calib);
+  IMU.init(calib, 0x68);  // re-init to apply biases and restore ±2000dps range
   Serial.println("Calibration done!");
   Serial.print("Accel biases X/Y/Z: ");
   Serial.print(calib.accelBias[0]);
@@ -199,11 +200,8 @@ void setup() {
   Serial.println(calib.gyroBias[2]);
   delay(2000);
 
-  IMU.init(calib, 0x68);
-
   pinMode(BOARD_LED, OUTPUT);
   digitalWrite(BOARD_LED, LOW);
-
 
   RadioEvents.TxDone = OnTxDone;
   RadioEvents.TxTimeout = OnTxTimeout;
@@ -219,6 +217,7 @@ void setup() {
                     LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
                     LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON, 0, true, 0,
                     0, LORA_IQ_INVERSION_ON, true);
+
   state = STATE_TX;
 }
 
@@ -258,6 +257,10 @@ void loop() {
     while (Serial1.available()) {
       gps.encode(Serial1.read());
     }
+    Wire1.end();
+    Wire1.begin(6, 7);
+    Wire1.setClock(400000);
+    IMU.init(calib, 0x68);
     IMU.update();
     IMU.getAccel(&accelData);
     IMU.getGyro(&gyroData);

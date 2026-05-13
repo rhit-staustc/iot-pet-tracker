@@ -1,7 +1,7 @@
 param(
     [string]$ComPort = "COM3",
     [int]$BaudRate = 115200,
-    [int]$DurationSeconds = 30
+    [int]$DurationSeconds = 20
 )
 
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
