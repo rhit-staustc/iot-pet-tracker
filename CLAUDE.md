@@ -40,7 +40,7 @@ Both base station and tracker nodes use the same hardware with different firmwar
 - **GPS module**: u-blox GPS (39=RX, 38=TX) reads location and speed
 - **Battery monitor**: ADC on pin 37 tracks voltage; calculated as percentage (3500-4200 mV)
 - **LoRa transmitter**: Sends GPSPacket every 500ms with device ID embedded in status byte
-- **IMU (MPU6500)**: Reads accelerometer and gyro on I2C (Wire) for behavior classification
+- **IMU (MPU6500)**: Reads accelerometer and gyro on I2C (Wire1, pins 6/7) for behavior classification
 - **Behavior classification**: Motion analysis (acceleration, speed) for idle/walking/running/sitting states
 
 ## Build & Development Commands
@@ -111,7 +111,7 @@ Web dashboard is served at `http://<device-ip>/` and displays all 4 tracker card
 
 ### IMU and I2C
 
-Tracker node uses the MPU6500 IMU on the shared I2C bus (Wire, pins 6/7). The IMU is calibrated on startup (5-second hold-still period) and provides accelerometer/gyro data for behavior classification. All devices use Wire (not Wire1) to avoid FastIMU compatibility issues.
+Tracker node uses the MPU6500 IMU on Wire1 (pins 6/7). Wire1 is used (not the default Wire) because FastIMU requires the bus instance at construction time and Wire1 avoids conflicts with other peripherals. The code also performs a bus recovery (Wire1.end/begin) before each transaction to handle I2C lockups. The IMU is calibrated on startup (5-second hold-still period) and provides accelerometer/gyro data for behavior classification.
 
 ## Repository Structure
 
@@ -146,11 +146,11 @@ datasheets/                (hardware datasheets)
 
 ## Known Issues & Branches
 
-- **`behavior-classification`**: Implements motion detection via IMU/GPS analysis. Stable but not merged to main.
-- **`mpu`**: IMU (MPU-9250) integration branch.
-- **`feature/web-server`**: Live dashboard via SSE; considered the latest feature branch.
+- **`feature/imu-no-oled`**: Active development branch. Removes OLED display, integrates MPU6500 IMU on Wire1 (pins 6/7) with behavior classification. Uses I2C bus recovery (Wire1.end/begin) before each transaction. Not yet merged to main.
+- **`feature/web-server`**: Live dashboard via SSE. Not yet merged to main.
+- **`mpu`**: Earlier IMU (MPU-9250) integration branch; superseded by `feature/imu-no-oled`.
 
-Main branch is the stable release with GPS + LoRa communication working.
+Main branch is the stable release with GPS + LoRa communication working. IMU and behavior classification are on `feature/imu-no-oled`.
 
 ## Libraries & Dependencies
 

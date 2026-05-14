@@ -73,6 +73,7 @@ static RadioEvents_t RadioEvents;
 static unsigned long lastPacket = 0;
 States_t state;
 bool sleepMode = false;
+bool needsBusRecovery = false;
 
 uint8_t getBatteryPercent() {
   pinMode(ADC_Ctrl, OUTPUT);
@@ -235,20 +236,19 @@ void gpsConfig() {
 
 void OnTxDone(void) {
   Serial.print("TX done......");
+  needsBusRecovery = true;
   state = STATE_RX;
 }
 
 void OnTxTimeout(void) {
   Radio.Sleep();
   Serial.print("TX Timeout......");
+  needsBusRecovery = true;
   state = STATE_TX;
 }
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
   Radio.Sleep();
-  if (size == sizeof(GPSPacket)) {
-    GPSPacket *received = (GPSPacket *)payload;
-  }
 }
 
 void loop() {
@@ -257,10 +257,13 @@ void loop() {
     while (Serial1.available()) {
       gps.encode(Serial1.read());
     }
-    Wire1.end();
-    Wire1.begin(6, 7);
-    Wire1.setClock(400000);
-    IMU.init(calib, 0x68);
+    if (needsBusRecovery) {
+      Wire1.end();
+      Wire1.begin(6, 7);
+      Wire1.setClock(400000);
+      IMU.init(calib, 0x68);
+      needsBusRecovery = false;
+    }
     IMU.update();
     IMU.getAccel(&accelData);
     IMU.getGyro(&gyroData);
