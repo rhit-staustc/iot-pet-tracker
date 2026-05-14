@@ -4,6 +4,15 @@
 #include "LoRaWan_APP.h"
 #include <Wire.h>
 
+// #define DEBUG
+#ifdef DEBUG
+  #define DBG(x)   Serial.print(x)
+  #define DBGLN(x) Serial.println(x)
+#else
+  #define DBG(x)
+  #define DBGLN(x)
+#endif
+
 #define PIN_GPS_EN 34
 #define GPS_RX_PIN 39
 #define GPS_TX_PIN 38
@@ -30,9 +39,8 @@
 #define RUN_SPEED_IN_MPH 5
 #define WALK_SPEED_IN_MPH 1
 #define HEAD_DIRECTION accelData.accelX
-#define ACCEL_NORMALIZE 8
-#define HEAD_ORIENTATION (HEAD_DIRECTION / ACCEL_NORMALIZE)
-#define SITTING_THRESHOLD 0.33
+#define HEAD_ORIENTATION HEAD_DIRECTION
+#define SITTING_THRESHOLD 0.70
 #define SPEED_FILTER_SIZE 8
 
 uint8_t DEVICE_ID = 2;
@@ -186,18 +194,14 @@ void setup() {
   IMU.calibrateAccelGyro(&calib);
   IMU.init(calib, 0x68);  // re-init to apply biases and restore ±2000dps range
   Serial.println("Calibration done!");
-  Serial.print("Accel biases X/Y/Z: ");
-  Serial.print(calib.accelBias[0]);
-  Serial.print(", ");
-  Serial.print(calib.accelBias[1]);
-  Serial.print(", ");
-  Serial.println(calib.accelBias[2]);
-  Serial.print("Gyro biases X/Y/Z: ");
-  Serial.print(calib.gyroBias[0]);
-  Serial.print(", ");
-  Serial.print(calib.gyroBias[1]);
-  Serial.print(", ");
-  Serial.println(calib.gyroBias[2]);
+  DBG("Accel biases X/Y/Z: ");
+  DBG(calib.accelBias[0]); DBG(", ");
+  DBG(calib.accelBias[1]); DBG(", ");
+  DBGLN(calib.accelBias[2]);
+  DBG("Gyro biases X/Y/Z: ");
+  DBG(calib.gyroBias[0]); DBG(", ");
+  DBG(calib.gyroBias[1]); DBG(", ");
+  DBGLN(calib.gyroBias[2]);
   delay(2000);
 
   pinMode(BOARD_LED, OUTPUT);
@@ -234,14 +238,14 @@ void gpsConfig() {
 }
 
 void OnTxDone(void) {
-  Serial.print("TX done......");
+  DBGLN("TX done");
   needsBusRecovery = true;
   state = STATE_RX;
 }
 
 void OnTxTimeout(void) {
   Radio.Sleep();
-  Serial.print("TX Timeout......");
+  DBGLN("TX Timeout");
   needsBusRecovery = true;
   state = STATE_TX;
 }
@@ -266,6 +270,8 @@ void loop() {
     IMU.update();
     IMU.getAccel(&accelData);
     IMU.getGyro(&gyroData);
+    DBG("Accel X/Y/Z: "); DBG(accelData.accelX); DBG(", "); DBG(accelData.accelY); DBG(", "); DBGLN(accelData.accelZ);
+    DBG("HeadOrient: "); DBG(HEAD_ORIENTATION); DBG(" (threshold: "); DBG(SITTING_THRESHOLD); DBGLN(")");
     GPSPacket packet = buildPacket();
     printPacket(packet);
     digitalWrite(BOARD_LED, HIGH);
@@ -276,7 +282,7 @@ void loop() {
     break;
   }
   case STATE_RX:
-    Serial.println("into RX mode");
+    DBGLN("into RX mode");
     Radio.Rx(0);
     lastPacket = millis();
     state = LOWPOWER;

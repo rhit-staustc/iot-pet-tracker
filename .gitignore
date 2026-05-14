@@ -2,3 +2,4 @@ mpu/notes.txt
 MPU9250-QUATERNIONS-master/*
 scripts/.flash-state
 scripts/monitor-output/*.txt
+.claude/settings.local.json

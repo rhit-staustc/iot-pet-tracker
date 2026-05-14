@@ -1,4 +1,6 @@
 #include <Wire.h>
+// WARNING: Uses Wire (not Wire1). Flash and run this sketch standalone, before any sketch that calls Mcu.begin(),
+// which reconfigures Wire to the OLED pins (17/18) and breaks I2C access to the IMU on pins 6/7.
 
 void setup() {
   Serial.begin(115200);
