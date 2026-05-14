@@ -146,11 +146,10 @@ datasheets/                (hardware datasheets)
 
 ## Known Issues & Branches
 
-- **`feature/imu-no-oled`**: Active development branch. Removes OLED display, integrates MPU6500 IMU on Wire1 (pins 6/7) with behavior classification. Uses I2C bus recovery (Wire1.end/begin) before each transaction. Not yet merged to main.
 - **`feature/web-server`**: Live dashboard via SSE. Not yet merged to main.
-- **`mpu`**: Earlier IMU (MPU-9250) integration branch; superseded by `feature/imu-no-oled`.
+- **`mpu`**: Earlier IMU (MPU-9250) integration branch; superseded and merged via `feature/imu-no-oled`.
 
-Main branch is the stable release with GPS + LoRa communication working. IMU and behavior classification are on `feature/imu-no-oled`.
+Main branch includes GPS + LoRa communication, MPU6500 IMU on Wire1, and behavior classification (idle/walking/running/sitting).
 
 ## Libraries & Dependencies
 

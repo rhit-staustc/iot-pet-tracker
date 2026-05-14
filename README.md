@@ -1,93 +1,80 @@
 # IoT Pet Tracker
 
-A real-time GPS and motion tracking system for pets using Heltec WiFi LoRa V4 boards.
+A real-time GPS and motion tracking system for pets using Heltec WiFi LoRa V4 boards. Tracker nodes report GPS location, speed, and IMU-based behavior (idle/walking/running/sitting) over LoRa to a base station that serves a live web dashboard.
 
-## Development
-
-### Setup
+## Setup
 
 1. **Install arduino-cli** from https://arduino.cc/en/software
 
 2. **Add Heltec board support:**
-   ```bash
+   ```powershell
    arduino-cli config add board_manager.additional_urls https://raw.githubusercontent.com/Heltec-Aaron-Lee/WiFi_Kit_series/master/package_heltec_esp32_index.json
    arduino-cli core update-index
    arduino-cli core install Heltec-esp32:esp32
    ```
 
 3. **Verify installation:**
-   ```bash
+   ```powershell
    arduino-cli board list
    ```
 
-### Building & Flashing
+## Building & Flashing
 
-Use the build scripts in `scripts/` directory. Default COM port is **COM3** (configurable).
+Default COM port is **COM3**. Use PowerShell for all commands.
 
-**Quick build and upload:**
-```bash
-# Build and flash Base Station
-./scripts/build.sh build-base
-
-# Build and flash Tracker Node
-./scripts/build.sh build-tracker COM4  # optional: specify different COM port
+**Compile:**
+```powershell
+arduino-cli compile --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc Production/Base-Station
+arduino-cli compile --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc Production/Tracker-Node
 ```
 
-**Individual commands:**
-```bash
-./scripts/build.sh compile-base           # Compile Base Station only
-./scripts/build.sh upload-base [PORT]     # Upload Base Station
-./scripts/build.sh compile-tracker        # Compile Tracker Node only
-./scripts/build.sh upload-tracker [PORT]  # Upload Tracker Node
-./scripts/build.sh monitor [PORT] [BAUD]  # Monitor serial output (default: COM3, 115200 baud)
+**Upload:**
+```powershell
+arduino-cli upload --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc -p COM3 Production/Base-Station
+arduino-cli upload --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc -p COM3 Production/Tracker-Node
 ```
 
-**Using environment variables:**
-```bash
-export COM_PORT=COM4
-./scripts/build.sh build-base  # Will use COM4
+**Monitor serial output (30 seconds):**
+```powershell
+powershell -ExecutionPolicy Bypass -File ./scripts/monitor-capture.ps1 -DurationSeconds 30
 ```
 
-### Project Structure
+## Project Structure
 
 See [CLAUDE.md](CLAUDE.md) for detailed architecture, hardware specifications, and implementation details.
 
 ```
 Production/
   Base-Station/       - WiFi hub that receives LoRa packets and serves web dashboard
-  Tracker-Node/       - GPS + LoRa tracker firmware
+  Tracker-Node/       - GPS + IMU + LoRa tracker firmware
+Testing/
+  I2C-Scanner/        - Diagnostic sketch to locate I2C devices (run before Mcu.begin())
+  GPS-Testing/        - GPS module validation
+  LoRa-Testing/       - LoRa range/reliability tests
 scripts/
-  build.sh           - Main build script (compile, upload, monitor)
-  compile-*.sh       - Individual compile scripts
-  upload-*.sh        - Individual upload scripts
-  monitor.sh         - Serial monitor
+  monitor-capture.ps1 - Captures timestamped serial output to scripts/monitor-output/
 ```
 
-### Common Tasks
+## Common Tasks
 
 **Flash a different tracker ID:**
-Edit `DEVICE_ID` in [Production/Tracker-Node/Tracker-Node.ino:38](Production/Tracker-Node/Tracker-Node.ino#L38) (0, 1, 2, or 3), then rebuild.
+Edit `DEVICE_ID` in [Production/Tracker-Node/Tracker-Node.ino:46](Production/Tracker-Node/Tracker-Node.ino#L46) (0, 1, 2, or 3), then recompile and upload.
+
+**Enable debug output:**
+Uncomment `#define DEBUG` near the top of [Tracker-Node.ino](Production/Tracker-Node/Tracker-Node.ino). Recompile and upload. Debug output includes IMU accel values, HeadOrient, calibration biases, and TX state transitions.
 
 **Change LoRa frequency:**
-Update LoRa `#define`s in both sketches (lines 18-26).
+Update the LoRa `#define`s in both sketches (identical values required in both).
 
-**Monitor serial output:**
-```bash
-./scripts/build.sh monitor COM3 115200
-```
-
-### Troubleshooting
+## Troubleshooting
 
 **"Platform Heltec-esp32:esp32 not found"**
-- Run the board setup commands under Setup → Add Heltec board support
+- Run the board setup commands under Setup above
 
 **"arduino-cli not found"**
-- Install from https://arduino.cc/en/software
-- Ensure it's in your PATH
+- Install from https://arduino.cc/en/software and ensure it's in your PATH
 
-**OLED display not working**
-- Check I2C connections (SDA/SCL pins)
-- Verify display is enabled with `Vext` power line
-- See [CLAUDE.md](CLAUDE.md) for OLED debugging
+**IMU reads frozen or wrong after first TX**
+- This is caused by RF-induced I2C bus lockup. The firmware recovers automatically via `needsBusRecovery` flag — see [CLAUDE.md](CLAUDE.md) for details.
 
-For more details, see [CLAUDE.md](CLAUDE.md).
+For full implementation details, see [CLAUDE.md](CLAUDE.md).
