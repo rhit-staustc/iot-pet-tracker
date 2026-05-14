@@ -72,7 +72,6 @@ typedef enum { LOWPOWER, STATE_RX, STATE_TX } States_t;
 static RadioEvents_t RadioEvents;
 static unsigned long lastPacket = 0;
 States_t state;
-bool sleepMode = false;
 bool needsBusRecovery = false;
 
 uint8_t getBatteryPercent() {
@@ -267,29 +266,7 @@ void loop() {
     IMU.update();
     IMU.getAccel(&accelData);
     IMU.getGyro(&gyroData);
-    Serial.print("Gyro Biases: ");
-    Serial.print(calib.gyroBias[0]);
-    Serial.print(", ");
-    Serial.print(calib.gyroBias[1]);
-    Serial.print(", ");
-    Serial.println(calib.gyroBias[2]);
-    Serial.print("IMU Accel: ");
-    Serial.print(accelData.accelX);
-    Serial.print(", ");
-    Serial.print(accelData.accelY);
-    Serial.print(", ");
-    Serial.println(accelData.accelZ);
-    Serial.print("IMU Gyro (calibrated): ");
-    Serial.print(gyroData.gyroX);
-    Serial.print(", ");
-    Serial.print(gyroData.gyroY);
-    Serial.print(", ");
-    Serial.println(gyroData.gyroZ);
     GPSPacket packet = buildPacket();
-    Serial.print("Speed (mph): ");
-    Serial.println(packet.speed / 100.0);
-    Serial.print("Behavior: ");
-    Serial.println(behaviorName(packet.status));
     printPacket(packet);
     digitalWrite(BOARD_LED, HIGH);
     Radio.Send((uint8_t *)&packet, sizeof(GPSPacket));

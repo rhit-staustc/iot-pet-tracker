@@ -5,7 +5,7 @@ param(
 )
 
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$outputFile = Join-Path (Get-Location) "monitor_${timestamp}.txt"
+$outputFile = Join-Path $PSScriptRoot "monitor-output\monitor_${timestamp}.txt"
 
 Write-Host "Capturing serial output from $ComPort at $BaudRate baud for ${DurationSeconds}s..."
 Write-Host "Output: $outputFile"
@@ -24,6 +24,7 @@ while ((Get-Date) - $start -lt [TimeSpan]::FromSeconds($DurationSeconds)) {
 }
 
 $port.Close()
+New-Item -ItemType Directory -Force -Path (Join-Path $PSScriptRoot "monitor-output") | Out-Null
 $lines | Out-File -FilePath $outputFile -Encoding utf8
 
 Write-Host "Done. Saved to: $outputFile ($($lines.Count) lines)"

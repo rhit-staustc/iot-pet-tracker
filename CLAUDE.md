@@ -111,7 +111,7 @@ Web dashboard is served at `http://<device-ip>/` and displays all 4 tracker card
 
 ### IMU and I2C
 
-Tracker node uses the MPU6500 IMU on Wire1 (pins 6/7). Wire1 is used (not the default Wire) because FastIMU requires the bus instance at construction time and Wire1 avoids conflicts with other peripherals. The code also performs a bus recovery (Wire1.end/begin) before each transaction to handle I2C lockups. The IMU is calibrated on startup (5-second hold-still period) and provides accelerometer/gyro data for behavior classification.
+Tracker node uses the MPU6500 IMU on Wire1 (pins 6/7). Wire1 is used instead of the default Wire because `Mcu.begin()` (the Heltec board init) calls `Wire.begin(SDA_OLED, SCL_OLED)` via the `HT_SSD1306Wire` OLED library, reconfiguring Wire to the OLED pins (17/18) and making it unusable for the IMU. Wire1 avoids this conflict. Additionally, transmitting at 28 dBm can corrupt in-flight I2C transactions, so the code performs bus recovery (`Wire1.end()` / `Wire1.begin()`) after each LoRa TX to clear any lockup. The IMU is calibrated on startup (5-second hold-still period) and provides accelerometer/gyro data for behavior classification.
 
 ## Repository Structure
 
