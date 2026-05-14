@@ -8,6 +8,6 @@ Compile and upload the Base Station firmware to the board.
    ```
    arduino-cli upload --fqbn Heltec-esp32:esp32:heltec_wifi_lora_32_V4:CDCOnBoot=cdc -p COM3 Production/Base-Station
    ```
-3. Report success or any errors. The serial monitor will start automatically after upload via the post-upload hook.
+3. Report success or any errors. Suggest running `/monitor` to capture serial output.
 
 If the user specifies a COM port (e.g. "flash base to COM4"), use that port instead of COM3.
