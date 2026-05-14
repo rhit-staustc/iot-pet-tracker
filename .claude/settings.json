@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(arduino-cli board *)",
+      "Bash(./scripts/build.sh *)",
+      "Bash(arduino-cli compile *)",
+      "Bash(arduino-cli upload *)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File ./scripts/auto-flash.ps1",
+            "shell": "powershell",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "PowerShell(arduino-cli upload *)",
+            "command": "powershell -ExecutionPolicy Bypass -File ./scripts/monitor-capture.ps1 -DurationSeconds 30",
+            "shell": "powershell",
+            "timeout": 60,
+            "statusMessage": "Capturing serial output (30s)..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(arduino-cli upload *)",
+            "command": "powershell -ExecutionPolicy Bypass -File ./scripts/monitor-capture.ps1 -DurationSeconds 30",
+            "shell": "powershell",
+            "timeout": 60,
+            "statusMessage": "Capturing serial output (30s)..."
+          }
+        ]
+      }
+    ]
+  }
+}
