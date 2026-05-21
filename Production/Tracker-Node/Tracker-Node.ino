@@ -27,7 +27,7 @@
 #define BOARD_LED 35
 #define TX_INTERVAL_MS 500
 
-uint8_t DEVICE_ID = 2;
+uint8_t DEVICE_ID = 0;
 const float VOLT_DIV = 4.9;
 
 TinyGPSPlus gps;

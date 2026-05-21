@@ -28,7 +28,7 @@ void setup() {
   digitalWrite(PIN_GPS_EN, LOW);
   delay(1000);
 
-  Serial1.begin(115200, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+  Serial1.begin(9600, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
   Serial.println("GPS starting...");
   sendPCAS("$PCAS04,7");                         // all constellations
   sendPCAS("$PCAS11,1");                         // pedestrian mode
