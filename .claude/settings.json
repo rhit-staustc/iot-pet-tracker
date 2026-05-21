@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(arduino-cli board *)",
+      "Bash(./scripts/build.sh *)",
+      "Bash(arduino-cli compile *)",
+      "Bash(arduino-cli upload *)"
+    ]
+  }
+}
