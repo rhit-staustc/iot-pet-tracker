@@ -1,10 +1,14 @@
 #include "Arduino.h"
 #include "HT_SSD1306Wire.h"
 #include "LoRaWan_APP.h"
+#include "index_html.h"
+#include <ArduinoJson.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <WiFi.h>
 #include <Wire.h>
 
 #define RF_FREQUENCY 915000000
-#define TX_OUTPUT_POWER 28
 #define LORA_BANDWIDTH 0
 #define LORA_SPREADING_FACTOR 10
 #define LORA_CODINGRATE 1
@@ -13,11 +17,9 @@
 #define LORA_FIX_LENGTH_PAYLOAD_ON false
 #define LORA_IQ_INVERSION_ON false
 #define BOARD_LED 35
-#define MAX_TRACKERS 4
-#define RX_WINDOW_MS 500
 
 struct GPSPacket {
-  uint8_t status;  // [reserved(4)|fresh(1)|fix_valid(1)|ID(2)]
+  uint8_t status;  // [behavior(4)|fresh(1)|fix_valid(1)|ID(2)]
   uint8_t battery; // 0-100%
   float lat;
   float lon;
@@ -25,125 +27,96 @@ struct GPSPacket {
   uint16_t course; // degrees * 100
 };
 
-struct CmdPacket {
-  uint8_t target_id; // 0-3 or 0xFF for all
-  uint8_t command;   // tbd
+struct WiFiNetwork {
+  const char *ssid;
+  const char *password;
 };
 
-struct TrackerState {
-  GPSPacket last;
-  int16_t rssi;
-  int16_t snr;
-  bool active;
+WiFiNetwork networks[] = {
+  {"RHIT-OPEN", ""},
+  {"Test", "password"},
+  {"ATO Wifi", "ATOest1865"}
 };
 
-static SSD1306Wire display(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64,
-                           RST_OLED);
+static SSD1306Wire display(0x3c, 500000, SDA_OLED, SCL_OLED, GEOMETRY_128_64, RST_OLED);
 static RadioEvents_t RadioEvents;
 
-TrackerState trackers[MAX_TRACKERS] = {};
-uint8_t displayedTracker = 0;
+AsyncWebServer server(80);
+AsyncWebSocket ws("/ws");
 
-bool cmdPending = false;
-CmdPacket pendingCmd;
+unsigned long ledFlashUntil = 0;
 
-typedef enum { LOWPOWER, STATE_RX, STATE_TX } States_t;
-States_t state;
-static unsigned long lastStateChange = 0;
+bool isRunActive = false;
+String currentRunId = "";
 
-void OnTxDone(void) {
-  Serial.println("CMD sent.");
-  state = STATE_RX;
+void connectWiFi() {
+  WiFi.mode(WIFI_STA);
+  for (auto &net : networks) {
+    WiFi.begin(net.ssid, net.password);
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+      delay(500);
+      attempts++;
+    }
+    if (WiFi.status() == WL_CONNECTED) {
+      while (WiFi.localIP() == IPAddress(0, 0, 0, 0)) delay(100);
+      display.clear();
+      display.drawString(0, 0, WiFi.localIP().toString());
+      display.drawString(0, 13, "Listening...");
+      display.display();
+      return;
+    }
+    WiFi.disconnect();
+    delay(200);
+  }
 }
 
-void OnTxTimeout(void) {
-  Radio.Sleep();
-  Serial.println("TX Timeout.");
-  state = STATE_RX;
+void broadcastTelemetry(GPSPacket *pkt, int16_t rssi, int8_t snr) {
+  StaticJsonDocument<300> doc;
+  doc["type"] = "DATA";
+  JsonObject p = doc.createNestedObject("payload");
+  p["id"]    = pkt->status & 0x03;
+  p["fix"]   = (pkt->status >> 2) & 1;
+  p["fresh"] = (pkt->status >> 3) & 1;
+  p["beh"]   = pkt->status >> 4;
+  p["bat"]   = pkt->battery;
+  p["lat"]   = pkt->lat;
+  p["lng"]   = pkt->lon;
+  p["spd"]   = pkt->speed / 100.0;
+  p["hd"]    = pkt->course / 100.0;
+  p["rssi"]  = rssi;
+  p["snr"]   = snr;
+  String out;
+  serializeJson(doc, out);
+  ws.textAll(out);
 }
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
+  ledFlashUntil = millis() + 80;
   digitalWrite(BOARD_LED, HIGH);
-  delay(20);
-  digitalWrite(BOARD_LED, LOW);
 
   if (size == sizeof(GPSPacket)) {
     GPSPacket *pkt = (GPSPacket *)payload;
-    uint8_t id = pkt->status & 0x03;
-    if (id < MAX_TRACKERS) {
-      trackers[id].last = *pkt;
-      trackers[id].rssi = rssi;
-      trackers[id].snr = snr;
-      trackers[id].active = true;
-
-      Serial.printf("[RX] ID:%d Fix:%s Fresh:%s Bat:%d%% Lat:%.6f Lon:%.6f "
-                    "Spd:%.1f Dir:%.1f RSSI:%d SNR:%d\n",
-                    id, (pkt->status >> 2) & 1 ? "Y" : "N",
-                    (pkt->status >> 3) & 1 ? "Y" : "N", pkt->battery, pkt->lat,
-                    pkt->lon, pkt->speed / 100.0, pkt->course / 100.0, rssi,
-                    snr);
-
-      updateDisplay(id);
-    }
+    broadcastTelemetry(pkt, rssi, snr);
   }
 
-  Radio.Sleep();
-  state = STATE_RX;
+  Radio.Rx(0);
 }
 
-void updateDisplay(uint8_t id) {
-  displayedTracker = id;
-  TrackerState &t = trackers[id];
-
-  display.clear();
-  display.setTextAlignment(TEXT_ALIGN_LEFT);
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(
-      0, 0,
-      "ID:" + String(id) +
-          " Fix:" + String((t.last.status >> 2) & 1 ? "Y" : "N") +
-          " Fresh:" + String((t.last.status >> 3) & 1 ? "Y" : "N") +
-          " Bat:" + String(t.last.battery) + "%");
-  display.drawString(0, 13, "Latitude: " + String(t.last.lat, 5));
-  display.drawString(0, 26, "Longitude: " + String(t.last.lon, 5));
-  display.drawString(0, 39,
-                     "Speed: " + String(t.last.speed / 100.0, 1) +
-                         "mph Dir: " + String(t.last.course / 100.0, 1));
-  display.drawString(
-      0, 52, "RSSI: " + String(t.rssi) + " dBm " + "SNR: " + String(t.snr));
-  display.display();
-}
-
-void handleSerialCommand() {
-  if (!Serial.available())
-    return;
-  String line = Serial.readStringUntil('\n');
-  line.trim();
-
-  if (line.startsWith("reset ")) {
-    String arg = line.substring(6);
-    arg.trim();
-    pendingCmd.command = 0x01;
-    pendingCmd.target_id = (arg == "all") ? 0xFF : (uint8_t)arg.toInt();
-    cmdPending = true;
-    Serial.printf("Queued GPS reset -> target %s\n", arg.c_str());
-
-  } else if (line.startsWith("show ")) {
-    uint8_t id = (uint8_t)line.substring(5).toInt();
-    if (id < MAX_TRACKERS && trackers[id].active) {
-      updateDisplay(id);
-      Serial.printf("Showing tracker %d\n", id);
-    } else {
-      Serial.printf("Tracker %d not active\n", id);
-    }
-
-  } else if (line.length() > 0) {
-    Serial.println("Commands: reset <id|all> | show <id>");
+void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
+               AwsEventType type, void *arg, uint8_t *data, size_t len) {
+  if (type == WS_EVT_CONNECT) {
+    StaticJsonDocument<128> doc;
+    doc["type"]   = "STATE";
+    doc["active"] = isRunActive;
+    doc["run_id"] = currentRunId;
+    String out;
+    serializeJson(doc, out);
+    client->text(out);
   }
 }
 
 void setup() {
-  Serial.begin(115200);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
 
   pinMode(BOARD_LED, OUTPUT);
@@ -155,56 +128,73 @@ void setup() {
   display.init();
   display.setFont(ArialMT_Plain_10);
   display.clear();
-  display.drawString(0, 0, "Base station ready");
-  display.drawString(0, 12, "Listening...");
+  display.drawString(0, 0, "Searching WiFi...");
   display.display();
+  connectWiFi();
 
-  RadioEvents.TxDone = OnTxDone;
-  RadioEvents.TxTimeout = OnTxTimeout;
+  ws.onEvent(onWsEvent);
+  server.addHandler(&ws);
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", index_html);
+  });
+
+  server.on("/api/run/start", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!isRunActive) {
+      isRunActive = true;
+      currentRunId = request->hasParam("id") ? request->getParam("id")->value()
+                                             : "run_" + String(millis());
+      StaticJsonDocument<64> m;
+      m["type"]   = "STATE";
+      m["active"] = true;
+      m["run_id"] = currentRunId;
+      String out;
+      serializeJson(m, out);
+      ws.textAll(out);
+      request->send(200, "application/json", "{\"status\":\"active\"}");
+    } else {
+      request->send(400, "text/plain", "Run already active");
+    }
+  });
+
+  server.on("/api/run/stop", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (isRunActive) {
+      isRunActive = false;
+      StaticJsonDocument<64> m;
+      m["type"]   = "STATE";
+      m["active"] = false;
+      m["run_id"] = "";
+      String out;
+      serializeJson(m, out);
+      ws.textAll(out);
+      request->send(200, "application/json", "{\"status\":\"stopped\"}");
+    } else {
+      request->send(400, "text/plain", "No run active");
+    }
+  });
+
+  server.begin();
+
   RadioEvents.RxDone = OnRxDone;
-
   Radio.Init(&RadioEvents);
   Radio.SetChannel(RF_FREQUENCY);
-  Radio.SetTxConfig(MODEM_LORA, TX_OUTPUT_POWER, 0, LORA_BANDWIDTH,
-                    LORA_SPREADING_FACTOR, LORA_CODINGRATE,
-                    LORA_PREAMBLE_LENGTH, LORA_FIX_LENGTH_PAYLOAD_ON, true, 0,
-                    0, LORA_IQ_INVERSION_ON, 3000);
   Radio.SetRxConfig(MODEM_LORA, LORA_BANDWIDTH, LORA_SPREADING_FACTOR,
                     LORA_CODINGRATE, 0, LORA_PREAMBLE_LENGTH,
                     LORA_SYMBOL_TIMEOUT, LORA_FIX_LENGTH_PAYLOAD_ON, 0, true, 0,
                     0, LORA_IQ_INVERSION_ON, true);
-
-  state = STATE_RX;
+  Radio.Rx(0);
 }
 
 void loop() {
-  handleSerialCommand();
+  if (WiFi.status() != WL_CONNECTED) connectWiFi();
+  ws.cleanupClients(2);
 
-  switch (state) {
-  case STATE_RX:
-    Radio.Rx(0);
-    lastStateChange = millis();
-    state = LOWPOWER;
-    break;
-
-  case STATE_TX: {
-    CmdPacket cmd = pendingCmd;
-    cmdPending = false;
-    Radio.Send((uint8_t *)&cmd, sizeof(CmdPacket));
-    lastStateChange = millis();
-    state = LOWPOWER;
-    break;
+  if (ledFlashUntil && millis() > ledFlashUntil) {
+    digitalWrite(BOARD_LED, LOW);
+    ledFlashUntil = 0;
   }
 
-  case LOWPOWER:
-    Radio.IrqProcess();
-    if (cmdPending && (millis() - lastStateChange >= RX_WINDOW_MS)) {
-      Radio.Sleep();
-      state = STATE_TX;
-    }
-    break;
+  delay(1);
 
-  default:
-    break;
-  }
+  Radio.IrqProcess();
 }
