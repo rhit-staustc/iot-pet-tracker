@@ -4,8 +4,9 @@
 #include <ArduinoJson.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <LittleFS.h>
 #include <WiFi.h>
+
+#define BOARD_LED 35
 
 // LoRa Config
 #define RF_FREQUENCY 915000000
@@ -24,14 +25,10 @@ struct WiFiNetwork {
 };
 
 WiFiNetwork networks[] = {
-  {"RHIT-OPEN", ""}
+  {"RHIT-OPEN", ""},
+  {"Test", "password"},
+  {"ATO Wifi", "ATOest1865"}
 };
-
-// WiFiNetwork networks[] = {
-//   {"RHIT-OPEN", ""},
-//   {"Test", "password"},
-//   {"ATO Wifi", "ATOest1865"}
-// };
 
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
@@ -39,6 +36,7 @@ AsyncWebSocket ws("/ws");
 // System State
 bool isRunActive = false;
 String currentRunId = "";
+unsigned long ledFlashUntil = 0;
 
 // Packets struct
 struct GPSPacket {
@@ -65,6 +63,7 @@ void connectWiFi() {
     if (WiFi.status() == WL_CONNECTED) {
       Serial.printf("Connected to %s\n", net.ssid);
       Serial.printf("IP: %s\n", WiFi.localIP().toString().c_str());
+      digitalWrite(BOARD_LED, HIGH);
       return;
     }
     WiFi.disconnect();
@@ -102,6 +101,8 @@ void handleTrackerPayload(GPSPacket *pkt, int16_t rssi, int8_t snr) {
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr) {
   if (size == sizeof(GPSPacket))
     handleTrackerPayload((GPSPacket *)payload, rssi, snr);
+  ledFlashUntil = millis() + 80;
+  digitalWrite(BOARD_LED, LOW);
   Radio.Rx(0);
 }
 
@@ -121,9 +122,8 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 void setup() {
   Serial.begin(115200);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
-
-  if (!LittleFS.begin(true))
-    Serial.println("LittleFS Mounting Error!");
+  pinMode(BOARD_LED, OUTPUT);
+  digitalWrite(BOARD_LED, LOW);
 
   connectWiFi();
 
@@ -137,7 +137,7 @@ void setup() {
   server.on("/api/run/start", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!isRunActive) {
       isRunActive = true;
-      currentRunId = "run_" + String(millis());
+      currentRunId = request->hasParam("id") ? request->getParam("id")->value() : "run_" + String(millis());
       StaticJsonDocument<64> m;
       m["type"] = "STATE";
       m["active"] = true;
@@ -165,47 +165,6 @@ void setup() {
     } else {
       request->send(400, "text/plain", "No run active");
     }
-  });
-
-  // Browser POSTs the full track here when run stops
-  server.on(
-      "/api/run/save", HTTP_POST, [](AsyncWebServerRequest *request) {}, NULL,
-      [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
-         size_t index, size_t total) {
-        String id = request->hasParam("id") ? request->getParam("id")->value()
-                                            : "run_" + String(millis());
-        File f = LittleFS.open("/" + id + ".json", "w");
-        if (f) {
-          f.write(data, len);
-          f.close();
-          request->send(200, "text/plain", "Saved");
-        } else {
-          request->send(500, "text/plain", "Write failed");
-        }
-      });
-
-  server.on("/api/results", HTTP_GET, [](AsyncWebServerRequest *request) {
-    StaticJsonDocument<512> doc;
-    JsonArray arr = doc.to<JsonArray>();
-    File root = LittleFS.open("/");
-    File file = root.openNextFile();
-    while (file) {
-      String name = String(file.name());
-      if (name.endsWith(".json"))
-        arr.add(name.substring(0, name.length() - 5)); // fixed off-by-one
-      file = root.openNextFile();
-    }
-    String out;
-    serializeJson(doc, out);
-    request->send(200, "application/json", out);
-  });
-
-  server.on("/api/results/view", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("id"))
-      request->send(LittleFS, "/" + request->getParam("id")->value() + ".json",
-                    "application/json");
-    else
-      request->send(400, "text/plain", "Missing id");
   });
 
   server.on(
@@ -236,6 +195,10 @@ void loop() {
   if (WiFi.status() != WL_CONNECTED)
     connectWiFi();
   Radio.IrqProcess();
-  ws.cleanupClients();
+  ws.cleanupClients(2);
+  if (ledFlashUntil && millis() > ledFlashUntil) {
+    digitalWrite(BOARD_LED, HIGH);
+    ledFlashUntil = 0;
+  }
   delay(1);
 }
